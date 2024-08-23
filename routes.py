@@ -23,7 +23,42 @@ def register_routes(app):
         
     @app.route('/jobs')
     def jobs():
-        job_listings = JobListing.query.order_by(JobListing.date_created.desc()).all()
+        # Get filter parameters from the query string
+        status = request.args.get('status')
+        job_type = request.args.get('job_type')
+        location_type = request.args.get('location_type')
+        salary_min = request.args.get('salary_min')
+        salary_max = request.args.get('salary_max')
+        company = request.args.get('company')
+        date_created = request.args.get('date_created')
+
+        # Start with all jobs
+        query = JobListing.query
+
+        # Apply filters dynamically based on input
+        if status:
+            query = query.filter_by(status=status)
+        
+        if job_type:
+            query = query.filter_by(job_type=job_type)
+        
+        if location_type:
+            query = query.filter_by(location_type=location_type)
+
+        if company:
+            query = query.filter(JobListing.company.ilike(f'%{company}%'))
+
+        if date_created:
+            query = query.filter(JobListing.date_created >= date_created)
+
+        if salary_min:
+            query = query.filter(JobListing.salary >= salary_min)
+
+        if salary_max:
+            query = query.filter(JobListing.salary <= salary_max)
+
+        # Execute the query and get filtered results
+        job_listings = query.order_by(JobListing.date_created.desc()).all()
 
         return render_template('jobs.html', jobs=job_listings)
 

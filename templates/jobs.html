@@ -51,6 +51,12 @@
             border-radius: 5px;
             cursor: pointer;
         }
+        .filter-form {
+            margin-bottom: 20px;
+        }
+        .filter-form label {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -66,6 +72,48 @@
             </ul>
         {% endif %}
     {% endwith %}
+
+    <!-- Filter Form -->
+    <form method="GET" action="{{ url_for('jobs') }}" class="filter-form">
+        <label for="status">Status:</label>
+        <select name="status" id="status">
+            <option value="">All</option>
+            <option value="Saved">Saved</option>
+            <option value="Applied">Applied</option>
+            <option value="Interviewing">Interviewing</option>
+            <option value="Offer">Offer</option>
+            <option value="Rejected">Rejected</option>
+        </select>
+
+        <label for="job_type">Job Type:</label>
+        <select name="job_type" id="job_type">
+            <option value="">All</option>
+            <option value="Full-time">Full-time</option>
+            <option value="Half-time">Half-time</option>
+        </select>
+
+        <label for="location_type">Location Type:</label>
+        <select name="location_type" id="location_type">
+            <option value="">All</option>
+            <option value="Remote">Remote</option>
+            <option value="Hybrid">Hybrid</option>
+            <option value="Office based">Office based</option>
+        </select>
+
+        <label for="salary_min">Salary Range:</label>
+        <input type="number" name="salary_min" id="salary_min" placeholder="Min" style="width: 80px;">
+        <input type="number" name="salary_max" id="salary_max" placeholder="Max" style="width: 80px;">
+
+        <label for="company">Company:</label>
+        <input type="text" name="company" id="company" placeholder="Company">
+
+        <label for="date_created">Date Created:</label>
+        <input type="date" name="date_created" id="date_created">
+
+        
+        <button type="submit" class="action-button">Filter</button>
+        <button type="reset" class="action-button">Reset</button>
+    </form>
 
     <!-- Add Job Button -->
     <div>
