@@ -162,10 +162,47 @@ def register_routes(app):
         ########
         # APIS
 
-    # api to get the list of jobs
+     # API to get the list of jobs with filters
     @app.route('/api/jobs', methods=['GET'])
     def get_jobs_api():
-        jobs = JobListing.query.all()
+        # Get filter parameters from the request
+        status = request.args.get('status')
+        job_type = request.args.get('job_type')
+        location_type = request.args.get('location_type')
+        salary_min = request.args.get('salary_min')
+        salary_max = request.args.get('salary_max')
+        company = request.args.get('company')
+        date_created = request.args.get('date_created')
+
+        # Start with all jobs
+        query = JobListing.query
+
+        # Apply filters dynamically based on input
+        if status:
+            query = query.filter_by(status=status)
+        
+        if job_type:
+            query = query.filter_by(job_type=job_type)
+        
+        if location_type:
+            query = query.filter_by(location_type=location_type)
+
+        if salary_min:
+            query = query.filter(JobListing.salary >= salary_min)
+
+        if salary_max:
+            query = query.filter(JobListing.salary <= salary_max)
+
+        if company:
+            query = query.filter(JobListing.company.ilike(f'%{company}%'))
+
+        if date_created:
+            query = query.filter(JobListing.date_created >= date_created)
+
+        # Execute the query and get filtered results
+        job_listings = query.order_by(JobListing.date_created.desc()).all()
+
+        # Convert to a list of dictionaries
         jobs_list = [{
             'id': job.id,
             'title': job.job_title,
@@ -178,13 +215,17 @@ def register_routes(app):
             'job_description': job.job_description,
             'notes': job.notes,
             'documents': job.documents
-        } for job in jobs]
+        } for job in job_listings]
         
         return jsonify(jobs_list)
     
     #api to add job
-    @app.route('/api/jobs', methods=['POST'])
+    @app.route('/api/jobs', methods=['OPTIONS', 'POST'])
     def add_job_api():
+        if request.method == 'OPTIONS':
+        # Preflight request
+            return '', 204  # Return 204 No Content for preflight requests
+
         data = request.json
 
         # Create a new job listing instance

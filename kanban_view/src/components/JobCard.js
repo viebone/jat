@@ -12,6 +12,15 @@ function JobCard({ job, onEdit, onDelete }) {
     }),
   }));
 
+  const handleDelete = (jobId) => {
+    axios.delete(`${process.env.REACT_APP_API_URL}/api/jobs/${jobId}`)
+      .then(() => {
+        setJobList(jobList.filter(job => job.id !== jobId));  // Remove the job from the state
+      })
+      .catch(error => console.error('Error deleting job:', error));
+  };
+  
+
   return (
     <div
       ref={drag}

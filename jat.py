@@ -5,8 +5,10 @@ from routes import register_routes  # Import the function to register routes
 
 app = Flask(__name__)
 
-# Enable CORS for all routes
-CORS(app)
+# Enable CORS for the entire app and allow specific methods
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}},
+     methods=["GET", "POST", "PUT", "DELETE"],
+     allow_headers=["Content-Type", "Authorization"])
 
 # Set a secret key for session management and security
 app.config['SECRET_KEY'] = 'admin'
