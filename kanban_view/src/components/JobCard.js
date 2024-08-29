@@ -1,7 +1,7 @@
-// src/components/JobCard.js
 import React from 'react';
 import { useDrag } from 'react-dnd';
 import EllipsisMenu from './EllipsisMenu';
+import axios from 'axios';
 
 function JobCard({ job, onEdit, onDelete }) {
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -12,15 +12,6 @@ function JobCard({ job, onEdit, onDelete }) {
     }),
   }));
 
-  const handleDelete = (jobId) => {
-    axios.delete(`${process.env.REACT_APP_API_URL}/api/jobs/${jobId}`)
-      .then(() => {
-        setJobList(jobList.filter(job => job.id !== jobId));  // Remove the job from the state
-      })
-      .catch(error => console.error('Error deleting job:', error));
-  };
-  
-
   return (
     <div
       ref={drag}
@@ -29,11 +20,11 @@ function JobCard({ job, onEdit, onDelete }) {
       }`}
     >
       <div>
-        <h3 className="font-bold">{job.title}</h3>
+        <h3 className="font-bold">{job.job_title}</h3> {/* Ensure job_title is used correctly */}
         <p className="text-gray-600">{job.company}</p>
         <p className="text-gray-600">${job.salary}</p>
       </div>
-      <EllipsisMenu onEdit={() => onEdit(job)} onDelete={() => onDelete(job)} />
+      <EllipsisMenu onEdit={() => onEdit(job)} onDelete={() => onDelete(job.id)} />
     </div>
   );
 }

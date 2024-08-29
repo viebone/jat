@@ -1,16 +1,18 @@
-// src/components/Column.js
 import React from 'react';
 import { useDrop } from 'react-dnd';
 import JobCard from './JobCard';
 
 function Column({ stage, jobs, onDrop, onEdit, onDelete }) {
-  const [{ isOver }, drop] = useDrop(() => ({
+  const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
-    drop: (item) => onDrop(item.id, stage),
+    drop: (item) => {
+      console.log('Dropping item:', item);
+      onDrop(item.id, stage);
+    },
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),
     }),
-  }));
+  });
 
   return (
     <div

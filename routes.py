@@ -205,7 +205,7 @@ def register_routes(app):
         # Convert to a list of dictionaries
         jobs_list = [{
             'id': job.id,
-            'title': job.job_title,
+            'job_title': job.job_title,
             'company': job.company,
             'job_post_link': job.job_post_link,
             'salary': job.salary,
