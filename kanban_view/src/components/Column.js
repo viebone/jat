@@ -17,7 +17,7 @@ function Column({ stage, jobs, onDrop, onEdit, onDelete }) {
   return (
     <div
       ref={drop}
-      className={`bg-gray-100 w-80 min-h-screen p-4 rounded-md shadow-md ${
+      className={`bg-gray-100 w-80 min-h-screen p-4 rounded-md shadow-md min-w-[320px] ${
         isOver ? 'bg-blue-100' : ''
       }`}
     >
