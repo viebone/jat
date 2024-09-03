@@ -11,12 +11,25 @@ function AddJob({ onJobAdded }) {
     job_type: 'Full-time',
     status: 'Saved',
     job_description: '',
-    notes: '',
+    notes: [],  // Initialize notes as an array to hold multiple notes
     documents: ''
   });
 
+  const [noteText, setNoteText] = useState('');  // State to manage individual note text input
+  const [noteStage, setNoteStage] = useState('Saved');  // State to manage the stage selection for notes
+
   const handleChange = (e) => {
     setNewJob({ ...newJob, [e.target.name]: e.target.value });
+  };
+
+  const handleAddNote = () => {
+    if (noteText) {
+      setNewJob({
+        ...newJob,
+        notes: [...newJob.notes, { stage: noteStage, note_text: noteText }]
+      });
+      setNoteText('');  // Clear the note input after adding
+    }
   };
 
   const handleSubmit = (e) => {
@@ -35,7 +48,7 @@ function AddJob({ onJobAdded }) {
           job_type: 'Full-time',
           status: 'Saved',
           job_description: '',
-          notes: '',
+          notes: [],  // Clear notes after submission
           documents: ''
         });
       })
@@ -92,6 +105,7 @@ function AddJob({ onJobAdded }) {
           name="salary"
           value={newJob.salary}
           onChange={handleChange}
+          required
           className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
@@ -153,15 +167,52 @@ function AddJob({ onJobAdded }) {
         ></textarea>
       </div>
 
+      {/* Notes Section */}
       <div className="mb-4">
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notes</label>
+        <label htmlFor="note_stage" className="block text-sm font-medium text-gray-700">Note Stage</label>
+        <select
+          id="note_stage"
+          name="note_stage"
+          value={noteStage}
+          onChange={(e) => setNoteStage(e.target.value)}
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
+        >
+          <option value="Saved">Saved</option>
+          <option value="Applied">Applied</option>
+          <option value="Interviewing">Interviewing</option>
+          <option value="Offer">Offer</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="note_text" className="block text-sm font-medium text-gray-700">Note</label>
         <textarea
-          id="notes"
-          name="notes"
-          value={newJob.notes}
-          onChange={handleChange}
+          id="note_text"
+          name="note_text"
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
           className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         ></textarea>
+        <button type="button" onClick={handleAddNote} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          Add Note
+        </button>
+      </div>
+
+      {/* Display added notes */}
+      <div className="mb-4">
+        <h3 className="text-sm font-medium text-gray-700">Notes</h3>
+        {newJob.notes.length > 0 ? (
+          <ul className="list-disc pl-5">
+            {newJob.notes.map((note, index) => (
+              <li key={index}>
+                <strong>{note.stage}:</strong> {note.note_text}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-600">No notes added yet.</p>
+        )}
       </div>
 
       <div className="mb-4">
