@@ -254,11 +254,65 @@ def update_job(job_id):
     job.job_type = data.get('job_type', job.job_type)
     job.status = data.get('status', job.status)
     job.job_description = data.get('job_description', job.job_description)
-    job.notes = data.get('notes', job.notes)
-    job.documents = data.get('documents', job.documents)
 
+    # Handle notes update:
+    notes_data = data.get('notes', [])
+    existing_note_ids = [note.id for note in job.notes]  # Existing note IDs in the database
+
+    # Update or add new notes
+    for note_data in notes_data:
+        if 'id' in note_data and note_data['id'] in existing_note_ids:
+            # Edit existing note
+            existing_note = Note.query.get(note_data['id'])
+            existing_note.stage = note_data['stage']
+            existing_note.note_text = note_data['note_text']
+        else:
+            # Add new note
+            new_note = Note(
+                job_id=job.id,
+                stage=note_data['stage'],
+                note_text=note_data['note_text']
+            )
+            db.session.add(new_note)
+
+    # Remove notes that were not sent in the request
+    new_note_ids = [note['id'] for note in notes_data if 'id' in note]  # IDs of notes in the incoming request
+    for existing_note in job.notes:
+        if existing_note.id not in new_note_ids:
+            db.session.delete(existing_note)
+
+    # Handle documents update (if applicable)
+    documents_data = data.get('documents', [])
+    existing_document_ids = [doc.id for doc in job.documents]
+
+    for document_data in documents_data:
+        if 'id' in document_data and document_data['id'] in existing_document_ids:
+            # Edit existing document
+            existing_document = Document.query.get(document_data['id'])
+            existing_document.stage = document_data['stage']
+            existing_document.document_name = document_data['document_name']
+            existing_document.document_url = document_data['document_url']
+        else:
+            # Add new document
+            new_document = Document(
+                job_id=job.id,
+                stage=document_data['stage'],
+                document_name=document_data['document_name'],
+                document_url=document_data['document_url']
+            )
+            db.session.add(new_document)
+
+    # Remove documents that were not sent in the request
+    new_document_ids = [doc['id'] for doc in documents_data if 'id' in doc]
+    for existing_document in job.documents:
+        if existing_document.id not in new_document_ids:
+            db.session.delete(existing_document)
+
+    # Commit changes to the database
     db.session.commit()
+
     return jsonify({'message': 'Job updated successfully'})
+
 
 # API to delete a job
 @bp.route('/api/jobs/<int:job_id>', methods=['DELETE'])

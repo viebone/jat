@@ -3,11 +3,16 @@ import axios from 'axios';
 
 function EditJob({ job, onJobEdited }) {
   const [updatedJob, setUpdatedJob] = useState(job);
+  const [newNoteText, setNewNoteText] = useState('');  // For adding new notes
+  const [newNoteStage, setNewNoteStage] = useState('Saved');  // For selecting the stage of a new note
+  const [editingNoteIndex, setEditingNoteIndex] = useState(null);  // Track the index of the note being edited
+  const [editNoteText, setEditNoteText] = useState('');  // Track the text of the note being edited
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);  // Track the index of the note being confirmed for deletion
 
-  // Ensure the form is populated with the job data when the component mounts or the job prop changes
+  // Populate form with job data when the component mounts or when the job prop changes
   useEffect(() => {
     if (job) {
-      setUpdatedJob(job);  // Ensure the form is prefilled with the job data
+      setUpdatedJob(job);
     }
   }, [job]);
 
@@ -15,10 +20,63 @@ function EditJob({ job, onJobEdited }) {
     setUpdatedJob({ ...updatedJob, [e.target.name]: e.target.value });
   };
 
+  // Add a new note
+  const handleAddNote = () => {
+    if (newNoteText.trim()) {
+      const newNote = { stage: newNoteStage, note_text: newNoteText };
+      setUpdatedJob((prevJob) => ({
+        ...prevJob,
+        notes: [...prevJob.notes, newNote],
+      }));
+      setNewNoteText('');  // Clear input after adding
+    }
+  };
+
+  // Start editing a note
+  const handleEditNote = (index) => {
+    setEditingNoteIndex(index);
+    setEditNoteText(updatedJob.notes[index].note_text);  // Set the current note text in the edit field
+  };
+
+  // Save the edited note
+  const handleSaveNote = (index) => {
+    const updatedNotes = [...updatedJob.notes];
+    updatedNotes[index].note_text = editNoteText;  // Update the note text
+    setUpdatedJob((prevJob) => ({
+      ...prevJob,
+      notes: updatedNotes,
+    }));
+    setEditingNoteIndex(null);  // Exit edit mode
+  };
+
+  // Cancel editing a note
+  const handleCancelEdit = () => {
+    setEditingNoteIndex(null);  // Exit edit mode without saving
+  };
+
+  // Handle removing a note with confirmation
+  const handleRemoveNote = (index) => {
+    setConfirmDeleteIndex(index);  // Prompt for confirmation
+  };
+
+  const confirmRemoveNote = (index) => {
+    const updatedNotes = [...updatedJob.notes];
+    updatedNotes.splice(index, 1);  // Remove the note at the specified index
+    setUpdatedJob((prevJob) => ({
+      ...prevJob,
+      notes: updatedNotes,
+    }));
+    setConfirmDeleteIndex(null);  // Reset confirmation
+  };
+
+  const cancelRemoveNote = () => {
+    setConfirmDeleteIndex(null);  // Reset confirmation
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     axios.put(`${process.env.REACT_APP_API_URL}/api/jobs/${updatedJob.id}`, {
-      title: updatedJob.job_title, // Make sure this is what your backend expects
+      title: updatedJob.job_title,
       company: updatedJob.company,
       job_post_link: updatedJob.job_post_link,
       salary: updatedJob.salary,
@@ -34,101 +92,200 @@ function EditJob({ job, onJobEdited }) {
     })
     .catch(error => console.error('Error updating job:', error));
   };
-  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Job fields */}
       <div>
         <label htmlFor="job_title" className="block text-sm font-medium text-gray-700">Job Title</label>
         <input
           type="text"
           id="job_title"
           name="job_title"
-          value={updatedJob?.job_title || ''}  // Ensure the field is populated
+          value={updatedJob?.job_title || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Job Title"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
           required
         />
       </div>
-
       <div>
         <label htmlFor="company" className="block text-sm font-medium text-gray-700">Company</label>
         <input
           type="text"
           id="company"
           name="company"
-          value={updatedJob?.company || ''}  // Ensure the field is populated
+          value={updatedJob?.company || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Company"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
           required
         />
       </div>
-
       <div>
         <label htmlFor="job_post_link" className="block text-sm font-medium text-gray-700">Job Post Link</label>
         <input
           type="url"
           id="job_post_link"
           name="job_post_link"
-          value={updatedJob?.job_post_link || ''}  // Ensure the field is populated
+          value={updatedJob?.job_post_link || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Job Post Link"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
-
       <div>
         <label htmlFor="salary" className="block text-sm font-medium text-gray-700">Salary</label>
         <input
           type="number"
           id="salary"
           name="salary"
-          value={updatedJob?.salary || ''}  // Ensure the field is populated
+          value={updatedJob?.salary || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Salary"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
-
       <div>
         <label htmlFor="location_type" className="block text-sm font-medium text-gray-700">Location Type</label>
         <select
           id="location_type"
           name="location_type"
-          value={updatedJob?.location_type || ''}  // Ensure the field is populated
+          value={updatedJob?.location_type || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         >
           <option value="Remote">Remote</option>
           <option value="Hybrid">Hybrid</option>
           <option value="Office based">Office based</option>
         </select>
       </div>
-
       <div>
         <label htmlFor="job_type" className="block text-sm font-medium text-gray-700">Job Type</label>
         <select
           id="job_type"
           name="job_type"
-          value={updatedJob?.job_type || ''}  // Ensure the field is populated
+          value={updatedJob?.job_type || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         >
           <option value="Full-time">Full-time</option>
           <option value="Half-time">Half-time</option>
         </select>
       </div>
-
       <div>
         <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
         <select
           id="status"
           name="status"
-          value={updatedJob?.status || ''}  // Ensure the field is populated
+          value={updatedJob?.status || ''}
           onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
+        >
+          <option value="Saved">Saved</option>
+          <option value="Applied">Applied</option>
+          <option value="Interviewing">Interviewing</option>
+          <option value="Offer">Offer</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">Job Description</label>
+        <textarea
+          id="job_description"
+          name="job_description"
+          value={updatedJob?.job_description || ''}
+          onChange={handleChange}
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
+        />
+      </div>
+
+      {/* Notes Section */}
+      <div>
+        <h3 className="block text-sm font-medium text-gray-700">Notes</h3>
+        {updatedJob?.notes?.length > 0 ? (
+          <ul className="list-disc pl-5">
+            {updatedJob.notes.map((note, index) => (
+              <li key={index} className="mb-4">
+                {/* Edit mode */}
+                {editingNoteIndex === index ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editNoteText}
+                      onChange={(e) => setEditNoteText(e.target.value)}
+                      className="p-2 block w-full border border-gray-300 rounded-md"
+                    />
+                    <div className="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveNote(index)}
+                        className="px-4 py-2 bg-green-500 text-white rounded-md"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-md"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <strong>{note.stage}:</strong> {note.note_text}
+                    <div className="flex space-x-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditNote(index)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-md"
+                      >
+                        Edit
+                      </button>
+                      {confirmDeleteIndex === index ? (
+                        <>
+                          <span>Are you sure?</span>
+                          <button
+                            type="button"
+                            onClick={() => confirmRemoveNote(index)}
+                            className="px-4 py-2 bg-red-500 text-white rounded-md"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelRemoveNote}
+                            className="px-4 py-2 bg-gray-500 text-white rounded-md"
+                          >
+                            No
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNote(index)}
+                          className="px-4 py-2 bg-red-500 text-white rounded-md"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No notes added yet.</p>
+        )}
+      </div>
+
+      {/* Add New Note */}
+      <div>
+        <label htmlFor="note_stage" className="block text-sm font-medium text-gray-700">Note Stage</label>
+        <select
+          id="note_stage"
+          name="note_stage"
+          value={newNoteStage}
+          onChange={(e) => setNewNoteStage(e.target.value)}
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         >
           <option value="Saved">Saved</option>
           <option value="Applied">Applied</option>
@@ -139,46 +296,21 @@ function EditJob({ job, onJobEdited }) {
       </div>
 
       <div>
-        <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">Job Description</label>
+        <label htmlFor="note_text" className="block text-sm font-medium text-gray-700">Note Text</label>
         <textarea
-          id="job_description"
-          name="job_description"
-          value={updatedJob?.job_description || ''}  // Ensure the field is populated
-          onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Job Description"
+          id="note_text"
+          name="note_text"
+          value={newNoteText}
+          onChange={(e) => setNewNoteText(e.target.value)}
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
-      </div>
-
-      <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notes</label>
-        <textarea
-          id="notes"
-          name="notes"
-          value={updatedJob?.notes || ''}  // Ensure the field is populated
-          onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Notes"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="documents" className="block text-sm font-medium text-gray-700">Documents</label>
-        <textarea
-          id="documents"
-          name="documents"
-          value={updatedJob?.documents || ''}  // Ensure the field is populated
-          onChange={handleChange}
-          className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Documents"
-        />
+        <button type="button" onClick={handleAddNote} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md">
+          Add Note
+        </button>
       </div>
 
       <div className="flex justify-end space-x-4">
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
           Save Changes
         </button>
       </div>
