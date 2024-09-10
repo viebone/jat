@@ -37,7 +37,7 @@ function JobCard({ job, onEdit, onDelete }) {
       </div>
       <div className="flex space-x-2 text-gray-600 text-xs">
         <span className="flex items-center">
-          <FontAwesomeIcon icon={faPaperclip} className="mr-1" /> ({job.documents ? job.documents.length : 0})
+          <FontAwesomeIcon icon={faPaperclip} className="mr-1" /> ({job.documents && job.documents.length ? job.documents.length : 0})
         </span>
         <span className="flex items-center">
           <FontAwesomeIcon icon={faTasks} className="mr-1" /> ({job.notes ? job.notes.length : 0})

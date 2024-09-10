@@ -9,6 +9,10 @@ function EditJob({ job, onJobEdited }) {
   const [editNoteText, setEditNoteText] = useState('');  // Track the text of the note being edited
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);  // Track the index of the note being confirmed for deletion
 
+  const [newDocumentFiles, setNewDocumentFiles] = useState([]);  // For handling new document uploads
+  const [removeDocumentIds, setRemoveDocumentIds] = useState([]);  // Track documents to be removed
+  const [removeNoteIds, setRemoveNoteIds] = useState([]);  // Track notes to be removed
+
   // Populate form with job data when the component mounts or when the job prop changes
   useEffect(() => {
     if (job) {
@@ -60,11 +64,15 @@ function EditJob({ job, onJobEdited }) {
   };
 
   const confirmRemoveNote = (index) => {
-    const updatedNotes = [...updatedJob.notes];
-    updatedNotes.splice(index, 1);  // Remove the note at the specified index
+    const noteToRemove = updatedJob.notes[index];
+    if (noteToRemove.id) {
+      // Add the note ID to removeNoteIds array
+      setRemoveNoteIds((prevIds) => [...prevIds, noteToRemove.id]);
+    }
+    // Remove the note from the UI
     setUpdatedJob((prevJob) => ({
       ...prevJob,
-      notes: updatedNotes,
+      notes: prevJob.notes.filter((_, i) => i !== index),
     }));
     setConfirmDeleteIndex(null);  // Reset confirmation
   };
@@ -73,24 +81,69 @@ function EditJob({ job, onJobEdited }) {
     setConfirmDeleteIndex(null);  // Reset confirmation
   };
 
+  // Handle document file selection
+  const handleDocumentUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setNewDocumentFiles(files);
+  };
+
+  // Remove a document from the list of existing documents
+  const handleRemoveDocument = (docId) => {
+    setRemoveDocumentIds((prevIds) => [...prevIds, docId]);  // Add the document ID to remove
+    setUpdatedJob((prevJob) => ({
+      ...prevJob,
+      documents: prevJob.documents.filter((doc) => doc.id !== docId),
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    axios.put(`${process.env.REACT_APP_API_URL}/api/jobs/${updatedJob.id}`, {
-      title: updatedJob.job_title,
-      company: updatedJob.company,
-      job_post_link: updatedJob.job_post_link,
-      salary: updatedJob.salary,
-      location_type: updatedJob.location_type,
-      job_type: updatedJob.job_type,
-      status: updatedJob.status,
-      job_description: updatedJob.job_description,
-      notes: updatedJob.notes,
-      documents: updatedJob.documents
+
+    const formData = new FormData();
+    formData.append('title', updatedJob.job_title);
+    formData.append('company', updatedJob.company);
+    formData.append('job_post_link', updatedJob.job_post_link);
+    formData.append('salary', updatedJob.salary);
+    formData.append('location_type', updatedJob.location_type);
+    formData.append('job_type', updatedJob.job_type);
+    formData.append('status', updatedJob.status);
+    formData.append('job_description', updatedJob.job_description);
+
+    // Add notes to formData
+    updatedJob.notes.forEach((note, index) => {
+      if (note.id) {
+        formData.append(`notes[${index}][id]`, note.id);  // Add existing note ID if available
+      }
+      formData.append(`notes[${index}][stage]`, note.stage);
+      formData.append(`notes[${index}][note_text]`, note.note_text);
+    });
+
+    // Attach new documents to formData
+    newDocumentFiles.forEach((file) => {
+      formData.append('documents[]', file);
+    });
+
+    // Add IDs of documents to remove
+    console.log('Remove Document IDs:', removeDocumentIds); // Add this line for debugging
+
+    removeDocumentIds.forEach((docId) => {
+      formData.append('remove_document_ids[]', docId);
+    });
+
+    // Add IDs of notes to remove
+    removeNoteIds.forEach((noteId) => {
+      formData.append('remove_note_ids[]', noteId);
+    });
+
+    axios.put(`${process.env.REACT_APP_API_URL}/api/jobs/${updatedJob.id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     })
     .then(() => {
       onJobEdited();  // Close the modal and refresh jobs after editing
     })
-    .catch(error => console.error('Error updating job:', error));
+    .catch((error) => console.error('Error updating job:', error));
   };
 
   return (
@@ -108,6 +161,7 @@ function EditJob({ job, onJobEdited }) {
           required
         />
       </div>
+
       <div>
         <label htmlFor="company" className="block text-sm font-medium text-gray-700">Company</label>
         <input
@@ -120,6 +174,7 @@ function EditJob({ job, onJobEdited }) {
           required
         />
       </div>
+
       <div>
         <label htmlFor="job_post_link" className="block text-sm font-medium text-gray-700">Job Post Link</label>
         <input
@@ -131,6 +186,7 @@ function EditJob({ job, onJobEdited }) {
           className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
+
       <div>
         <label htmlFor="salary" className="block text-sm font-medium text-gray-700">Salary</label>
         <input
@@ -142,6 +198,7 @@ function EditJob({ job, onJobEdited }) {
           className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
+
       <div>
         <label htmlFor="location_type" className="block text-sm font-medium text-gray-700">Location Type</label>
         <select
@@ -156,6 +213,7 @@ function EditJob({ job, onJobEdited }) {
           <option value="Office based">Office based</option>
         </select>
       </div>
+
       <div>
         <label htmlFor="job_type" className="block text-sm font-medium text-gray-700">Job Type</label>
         <select
@@ -169,6 +227,7 @@ function EditJob({ job, onJobEdited }) {
           <option value="Half-time">Half-time</option>
         </select>
       </div>
+
       <div>
         <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
         <select
@@ -185,6 +244,7 @@ function EditJob({ job, onJobEdited }) {
           <option value="Rejected">Rejected</option>
         </select>
       </div>
+
       <div>
         <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">Job Description</label>
         <textarea
@@ -307,6 +367,33 @@ function EditJob({ job, onJobEdited }) {
         <button type="button" onClick={handleAddNote} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md">
           Add Note
         </button>
+      </div>
+
+      {/* Document Section */}
+      <div>
+        <h3 className="block text-sm font-medium text-gray-700">Documents</h3>
+        <input
+          type="file"
+          multiple
+          onChange={handleDocumentUpload}
+          className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 mt-2"
+        />
+        <ul className="list-disc pl-5 mt-2">
+          {updatedJob?.documents?.map((doc) => (
+            <li key={doc.id} className="flex justify-between items-center mb-2">
+              <a href={`${process.env.REACT_APP_API_URL}/${doc.document_url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {doc.document_name}
+              </a>
+              <button
+                type="button"
+                onClick={() => handleRemoveDocument(doc.id)}
+                className="ml-4 text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="flex justify-end space-x-4">

@@ -12,7 +12,7 @@ function AddJob({ onJobAdded }) {
     status: 'Saved',
     job_description: '',
     notes: [],  // Initialize notes as an array to hold multiple notes
-    documents: ''
+    documents: [],  // Initialize documents as an array to hold multiple files
   });
 
   const [noteText, setNoteText] = useState('');  // State to manage individual note text input
@@ -22,11 +22,14 @@ function AddJob({ onJobAdded }) {
   const [editNoteStage, setEditNoteStage] = useState('Saved');  // Track the stage of the note being edited
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);  // Track the index of the note being confirmed for deletion
 
+  const [documentFiles, setDocumentFiles] = useState([]);  // Track uploaded document files
+
+  // Handle input changes for job fields
   const handleChange = (e) => {
     setNewJob({ ...newJob, [e.target.name]: e.target.value });
   };
 
-  // Add a new note
+  // Handle adding a new note
   const handleAddNote = () => {
     if (noteText.trim()) {
       const newNote = { stage: noteStage, note_text: noteText };
@@ -41,15 +44,15 @@ function AddJob({ onJobAdded }) {
   // Start editing a note
   const handleEditNote = (index) => {
     setEditingNoteIndex(index);
-    setEditNoteText(newJob.notes[index].note_text);  // Set the current note text in the edit field
-    setEditNoteStage(newJob.notes[index].stage);  // Set the current note stage in the edit field
+    setEditNoteText(newJob.notes[index].note_text);
+    setEditNoteStage(newJob.notes[index].stage);
   };
 
   // Save the edited note
   const handleSaveNote = (index) => {
     const updatedNotes = [...newJob.notes];
-    updatedNotes[index].note_text = editNoteText;  // Update the note text
-    updatedNotes[index].stage = editNoteStage;  // Update the note stage
+    updatedNotes[index].note_text = editNoteText;
+    updatedNotes[index].stage = editNoteStage;
     setNewJob((prevJob) => ({
       ...prevJob,
       notes: updatedNotes,
@@ -81,11 +84,51 @@ function AddJob({ onJobAdded }) {
     setConfirmDeleteIndex(null);  // Reset confirmation
   };
 
+  // Handle document file selection
+  const handleFileChange = (e) => {
+    setDocumentFiles([...e.target.files]);
+  };
+
+  // Handle removing a document before submission
+  const handleRemoveDocument = (index) => {
+    const updatedFiles = [...documentFiles];
+    updatedFiles.splice(index, 1);  // Remove the document at the specified index
+    setDocumentFiles(updatedFiles);
+  };
+
+  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
 
     const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    axios.post(`${apiUrl}/api/jobs`, newJob)
+
+    // Create form data to handle file uploads
+    const formData = new FormData();
+
+    // Append job details
+    formData.append('title', newJob.title);
+    formData.append('company', newJob.company);
+    formData.append('job_post_link', newJob.job_post_link);
+    formData.append('salary', newJob.salary);
+    formData.append('location_type', newJob.location_type);
+    formData.append('job_type', newJob.job_type);
+    formData.append('status', newJob.status);
+    formData.append('job_description', newJob.job_description);
+
+    // Append notes as JSON string
+    formData.append('notes', JSON.stringify(newJob.notes));
+
+    // Append documents
+    documentFiles.forEach((file, index) => {
+      formData.append(`documents[]`, file);  // Multiple file uploads
+    });
+
+    // Send form data to the server
+    axios.post(`${apiUrl}/api/jobs`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
       .then(() => {
         onJobAdded();  // Refresh the job list
         setNewJob({
@@ -97,9 +140,10 @@ function AddJob({ onJobAdded }) {
           job_type: 'Full-time',
           status: 'Saved',
           job_description: '',
-          notes: [],  // Clear notes after submission
-          documents: ''
+          notes: [],
+          documents: []
         });
+        setDocumentFiles([]);  // Clear document files after submission
       })
       .catch(error => console.error('Error adding job:', error));
   };
@@ -155,6 +199,7 @@ function AddJob({ onJobAdded }) {
           name="salary"
           value={newJob.salary}
           onChange={handleChange}
+          required
           className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
         />
       </div>
@@ -339,6 +384,40 @@ function AddJob({ onJobAdded }) {
           <p className="text-sm text-gray-600">No notes added yet.</p>
         )}
       </div>
+
+      {/* Documents Section */}
+      <div className="mb-4">
+        <label htmlFor="documents" className="block text-sm font-medium text-gray-700">Upload Documents</label>
+        <input
+          type="file"
+          id="documents"
+          name="documents"
+          multiple
+          onChange={handleFileChange}
+          className="mt-1 p-2 block w-full border border-gray-300 rounded-md"
+        />
+      </div>
+
+      {/* Display and manage added documents */}
+      {documentFiles.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-gray-700">Uploaded Documents</h3>
+          <ul className="list-disc pl-5">
+            {documentFiles.map((file, index) => (
+              <li key={index} className="mb-2">
+                {file.name}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDocument(index)}
+                  className="ml-4 px-3 py-1 bg-red-600 text-white rounded-md"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="text-center">
         <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">

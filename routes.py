@@ -1,152 +1,29 @@
 from sqlalchemy import text
 from db import db
-from flask import request, redirect, url_for, flash, jsonify, send_from_directory, Blueprint, render_template
+from flask import request, redirect, url_for, flash, jsonify, send_from_directory, Blueprint, render_template, current_app
 from models import JobListing, Note, Document
+import os
+from werkzeug.utils import secure_filename
 
 bp = Blueprint('main', __name__)
 
-# route for plain html template
+# Path to store uploaded documents
+UPLOAD_FOLDER = 'uploads/documents'
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg'}
 
-# Home
-@bp.route('/plain_html/')
-def hello():
-    return "Hello"
+# Ensure the upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-# List of jobs    
-@bp.route('/plain_html/jobs')
-def jobs():
-    # Get filter parameters from the query string
-    status = request.args.get('status')
-    job_type = request.args.get('job_type')
-    location_type = request.args.get('location_type')
-    salary_min = request.args.get('salary_min')
-    salary_max = request.args.get('salary_max')
-    company = request.args.get('company')
-    date_created = request.args.get('date_created')
+# Helper function to check allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    # Start with all jobs
-    query = JobListing.query
 
-    # Apply filters dynamically based on input
-    if status:
-        query = query.filter_by(status=status)
-    
-    if job_type:
-        query = query.filter_by(job_type=job_type)
-    
-    if location_type:
-        query = query.filter_by(location_type=location_type)
 
-    if company:
-        query = query.filter(JobListing.company.ilike(f'%{company}%'))
-
-    if date_created:
-        query = query.filter(JobListing.date_created >= date_created)
-
-    if salary_min:
-        query = query.filter(JobListing.salary >= salary_min)
-
-    if salary_max:
-        query = query.filter(JobListing.salary <= salary_max)
-
-    # Execute the query and get filtered results
-    job_listings = query.order_by(JobListing.date_created.desc()).all()
-
-    return render_template('/plain_html/jobs.html', jobs=job_listings)
-
-# Job details
-@bp.route('/plain_html/jobs/<int:job_id>')
-def job_details(job_id):
-    # Fetch the job by its ID
-    job = JobListing.query.get_or_404(job_id)
-    
-    # Render the job details page
-    return render_template('/plain_html/job_details.html', job=job)
-
-# Edit job
-@bp.route('/plain_html/jobs/<int:job_id>/edit', methods=['GET', 'POST'])
-def edit_job(job_id):
-    job = JobListing.query.get_or_404(job_id)
-
-    if request.method == 'POST':
-        # Update the job with the new data from the form
-        job.job_title = request.form['job_title']
-        job.company = request.form['company']
-        job.job_post_link = request.form['job_post_link']
-        job.salary = request.form['salary']
-        job.location_type = request.form['location_type']
-        job.job_type = request.form['job_type']
-        job.status = request.form['status']
-        job.job_description = request.form['job_description']
-        job.notes = request.form['notes']
-        job.documents = request.form['documents']
-
-        # Commit the changes to the database
-        db.session.commit()
-
-        flash('Job updated successfully!', 'success')
-        return redirect(url_for('main.job_details', job_id=job.id))  # Use blueprint name 'main' in url_for
-
-    # Render the form pre-filled with the current job data
-    return render_template('/plain_html/edit_job.html', job=job)
-
-# Add job
-@bp.route('/plain_html/jobs/add', methods=['GET', 'POST'])
-def add_job():
-    if request.method == 'POST':
-        # Collect form data
-        job_title = request.form['job_title']
-        company = request.form['company']
-        job_post_link = request.form['job_post_link']
-        salary = request.form['salary']
-        location_type = request.form['location_type']
-        job_type = request.form['job_type']
-        status = request.form['status']
-        job_description = request.form['job_description']
-        notes = request.form['notes']
-        documents = request.form['documents']
-
-        # Create a new job listing instance
-        new_job = JobListing(
-            job_title=job_title,
-            company=company,
-            job_post_link=job_post_link,
-            salary=salary,
-            location_type=location_type,
-            job_type=job_type,
-            status=status,
-            job_description=job_description,
-            notes=notes,
-            documents=documents
-        )
-
-        # Add the new job to the database
-        db.session.add(new_job)
-        db.session.commit()
-
-        flash('New job added successfully!', 'success')
-        return redirect(url_for('main.jobs'))  # Use blueprint name 'main' in url_for
-
-    return render_template('/plain_html/add_job.html')
-
-# Delete job
-@bp.route('/plain_html/jobs/delete', methods=['POST'])
-def delete_jobs():
-    job_ids = request.form.getlist('job_ids')  # Get the list of job IDs to delete
-    if job_ids:
-        # Delete the selected jobs from the database
-        JobListing.query.filter(JobListing.id.in_(job_ids)).delete(synchronize_session=False)
-        db.session.commit()
-        flash(f'{len(job_ids)} job(s) deleted successfully!', 'success')
-    else:
-        flash('No jobs selected for deletion.', 'error')
-
-    return redirect(url_for('main.jobs'))  # Use blueprint name 'main' in url_for
-
-# API to get the list of jobs with filters
+# API to get jobs with filters
 @bp.route('/api/jobs', methods=['GET'])
 def get_jobs_api():
-    # Get filter parameters from the request
     status = request.args.get('status')
     job_type = request.args.get('job_type')
     location_type = request.args.get('location_type')
@@ -155,10 +32,8 @@ def get_jobs_api():
     company = request.args.get('company')
     date_created = request.args.get('date_created')
 
-    # Start with all jobs
     query = JobListing.query
 
-    # Apply filters dynamically based on input
     if status:
         query = query.filter_by(status=status)
     
@@ -180,10 +55,8 @@ def get_jobs_api():
     if date_created:
         query = query.filter(JobListing.date_created >= date_created)
 
-    # Execute the query and get filtered results
     job_listings = query.order_by(JobListing.date_created.desc()).all()
 
-    # Convert to a list of dictionaries with serialized notes and documents
     jobs_list = [{
         'id': job.id,
         'job_title': job.job_title,
@@ -200,74 +73,92 @@ def get_jobs_api():
 
     return jsonify(jobs_list)
 
-# API to add job
-@bp.route('/api/jobs', methods=['OPTIONS', 'POST'])
+# API to add job with document upload handling
+@bp.route('/api/jobs', methods=['POST'])
 def add_job_api():
-    print(request.method)  # Debugging statement to check HTTP method
+    # Check if the request contains form data
+    if 'title' not in request.form:
+        return jsonify({'error': 'No job data provided'}), 400
 
-    if request.method == 'OPTIONS':
-        return '', 204
+    # Extract job data from the form
+    title = request.form['title']
+    company = request.form['company']
+    job_post_link = request.form.get('job_post_link', None)
+    salary = request.form.get('salary', None)
+    location_type = request.form.get('location_type', None)
+    job_type = request.form.get('job_type', None)
+    status = request.form.get('status', None)
+    job_description = request.form.get('job_description', None)
 
-    data = request.json
+    # Handle notes (which are sent as a JSON string)
+    notes = request.form.get('notes', '[]')
+    notes = eval(notes)  # Convert JSON string back to list
 
-    # Create a new job listing instance
+    # Create a new job listing
     new_job = JobListing(
-        job_title=data['title'],
-        company=data['company'],
-        job_post_link=data.get('job_post_link'),
-        salary=data.get('salary'),
-        location_type=data.get('location_type'),
-        job_type=data.get('job_type'),
-        status=data.get('status'),
-        job_description=data.get('job_description'),
+        job_title=title,
+        company=company,
+        job_post_link=job_post_link,
+        salary=salary,
+        location_type=location_type,
+        job_type=job_type,
+        status=status,
+        job_description=job_description
     )
-
     db.session.add(new_job)
     db.session.commit()
 
-    # Add notes if provided
-    notes_data = data.get('notes', [])
-    for note in notes_data:
+    # Add notes if any
+    for note in notes:
         new_note = Note(
             job_id=new_job.id,
-            stage=note.get('stage'),
-            note_text=note.get('note_text')
+            stage=note['stage'],
+            note_text=note['note_text']
         )
         db.session.add(new_note)
+    
+    # Handle document uploads
+    if 'documents[]' in request.files:
+        files = request.files.getlist('documents[]')
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(UPLOAD_FOLDER, filename))  # Save the file
+                new_document = Document(
+                    job_id=new_job.id,
+                    document_name=filename,
+                    document_url=os.path.join('uploads', filename),
+                    stage=request.form.get('stage', 'Saved')  # Optionally handle the stage
+                )
+                db.session.add(new_document)
 
     db.session.commit()
-
     return jsonify({'message': 'Job added successfully', 'job_id': new_job.id})
 
-# API to update job details
+# Edit job with document upload and deletion
 @bp.route('/api/jobs/<int:job_id>', methods=['PUT'])
 def update_job(job_id):
-    data = request.json
     job = JobListing.query.get_or_404(job_id)
 
     # Update job details
-    job.job_title = data.get('title', job.job_title)
-    job.company = data.get('company', job.company)
-    job.job_post_link = data.get('job_post_link', job.job_post_link)
-    job.salary = data.get('salary', job.salary)
-    job.location_type = data.get('location_type', job.location_type)
-    job.job_type = data.get('job_type', job.job_type)
-    job.status = data.get('status', job.status)
-    job.job_description = data.get('job_description', job.job_description)
+    job.job_title = request.form.get('title', job.job_title)
+    job.company = request.form.get('company', job.company)
+    job.job_post_link = request.form.get('job_post_link', job.job_post_link)
+    job.salary = request.form.get('salary', job.salary)
+    job.location_type = request.form.get('location_type', job.location_type)
+    job.job_type = request.form.get('job_type', job.job_type)
+    job.status = request.form.get('status', job.status)
+    job.job_description = request.form.get('job_description', job.job_description)
 
-    # Handle notes update:
-    notes_data = data.get('notes', [])
-    existing_note_ids = [note.id for note in job.notes]  # Existing note IDs in the database
-
-    # Update or add new notes
-    for note_data in notes_data:
+    # Handle notes (add or update)
+    notes = request.form.getlist('notes')
+    existing_note_ids = [note.id for note in job.notes]
+    for note_data in notes:
         if 'id' in note_data and note_data['id'] in existing_note_ids:
-            # Edit existing note
             existing_note = Note.query.get(note_data['id'])
             existing_note.stage = note_data['stage']
             existing_note.note_text = note_data['note_text']
         else:
-            # Add new note
             new_note = Note(
                 job_id=job.id,
                 stage=note_data['stage'],
@@ -275,49 +166,74 @@ def update_job(job_id):
             )
             db.session.add(new_note)
 
-    # Remove notes that were not sent in the request
-    new_note_ids = [note['id'] for note in notes_data if 'id' in note]  # IDs of notes in the incoming request
-    for existing_note in job.notes:
-        if existing_note.id not in new_note_ids:
-            db.session.delete(existing_note)
+    # Handle document uploads
+    if 'documents[]' in request.files:
+        for document in request.files.getlist('documents[]'):
+            if document and allowed_file(document.filename):
+                filename = secure_filename(document.filename)
+                document_path = os.path.join(UPLOAD_FOLDER, filename)
+                document.save(document_path)
 
-    # Handle documents update (if applicable)
-    documents_data = data.get('documents', [])
-    existing_document_ids = [doc.id for doc in job.documents]
+                new_document = Document(
+                    job_id=job.id,
+                    stage=request.form.get('document_stage', 'Saved'),
+                    document_name=filename,
+                    document_url=document_path
+                )
+                db.session.add(new_document)
 
-    for document_data in documents_data:
-        if 'id' in document_data and document_data['id'] in existing_document_ids:
-            # Edit existing document
-            existing_document = Document.query.get(document_data['id'])
-            existing_document.stage = document_data['stage']
-            existing_document.document_name = document_data['document_name']
-            existing_document.document_url = document_data['document_url']
-        else:
-            # Add new document
-            new_document = Document(
-                job_id=job.id,
-                stage=document_data['stage'],
-                document_name=document_data['document_name'],
-                document_url=document_data['document_url']
-            )
-            db.session.add(new_document)
+    # Handle document removal
+    document_ids_to_remove = request.form.getlist('remove_document_ids[]')
+    print(f"Document IDs to remove: {document_ids_to_remove}")
 
-    # Remove documents that were not sent in the request
-    new_document_ids = [doc['id'] for doc in documents_data if 'id' in doc]
-    for existing_document in job.documents:
-        if existing_document.id not in new_document_ids:
-            db.session.delete(existing_document)
+    for document_id in document_ids_to_remove:
+        document = Document.query.get(document_id)
+        if document:
+            try:
+                # Remove the document from the file system
+                print(f"Removing file: {document.document_url}")
+                if os.path.exists(document.document_url):
+                    os.remove(document.document_url)
+                else:
+                    print(f"File {document.document_url} does not exist.")
+            except Exception as e:
+                print(f"Error removing file: {e}")  # Log error if file doesn't exist or can't be deleted
 
-    # Commit changes to the database
+            # Remove the document entry from the database
+            db.session.delete(document)
+
+    # Handle note removal (missing part added)
+    remove_note_ids = request.form.getlist('remove_note_ids[]')  # Get note IDs to remove
+    for note_id in remove_note_ids:
+        note = Note.query.get(note_id)
+        if note:
+            db.session.delete(note)
+
+    # Commit all changes
     db.session.commit()
 
     return jsonify({'message': 'Job updated successfully'})
+
 
 
 # API to delete a job
 @bp.route('/api/jobs/<int:job_id>', methods=['DELETE'])
 def delete_job(job_id):
     job = JobListing.query.get_or_404(job_id)
+
+    # Handle associated documents (delete files from filesystem)
+    for document in job.documents:
+        try:
+            if os.path.exists(document.document_url):
+                os.remove(document.document_url)  # Remove file from filesystem
+            else:
+                print(f"File {document.document_url} does not exist.")
+        except Exception as e:
+            print(f"Error deleting file {document.document_url}: {e}")
+        # Delete the document from the database even if file removal fails
+        db.session.delete(document)
+
+    # Delete the job
     db.session.delete(job)
     db.session.commit()
     return jsonify({'message': 'Job deleted successfully'})
