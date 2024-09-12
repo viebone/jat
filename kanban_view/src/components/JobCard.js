@@ -21,8 +21,14 @@ function JobCard({ job, onEdit, onDelete }) {
       }`}
     >
       <div className="flex justify-between items-center">
-        <h3 className="font-bold text-lg">
-          {job.job_title}
+      <h3 className="font-bold text-lg">
+          <button
+            onClick={() => onEdit(job)} // Call onEdit when title is clicked
+            className="text-blue-500 hover:text-blue-700 focus:outline-none"
+            aria-label={`Edit job: ${job.job_title}`}
+          >
+            {job.job_title}
+          </button>
         </h3>
         <EllipsisMenu onEdit={() => onEdit(job)} onDelete={() => onDelete(job.id)} />
       </div>

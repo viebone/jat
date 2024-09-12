@@ -111,6 +111,7 @@ function EditJob({ job, onJobEdited }) {
 
     // Add notes to formData
     updatedJob.notes.forEach((note, index) => {
+      console.log('notes:', note); // Add this line for debugging
       if (note.id) {
         formData.append(`notes[${index}][id]`, note.id);  // Add existing note ID if available
       }

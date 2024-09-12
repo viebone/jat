@@ -151,20 +151,30 @@ def update_job(job_id):
     job.job_description = request.form.get('job_description', job.job_description)
 
     # Handle notes (add or update)
-    notes = request.form.getlist('notes')
-    existing_note_ids = [note.id for note in job.notes]
-    for note_data in notes:
-        if 'id' in note_data and note_data['id'] in existing_note_ids:
-            existing_note = Note.query.get(note_data['id'])
-            existing_note.stage = note_data['stage']
-            existing_note.note_text = note_data['note_text']
-        else:
+    notes_data = request.form.to_dict(flat=False)  # Convert form data to a dictionary
+    note_keys = [key for key in notes_data if key.startswith('notes')]  # Filter note-related keys
+
+    existing_note_ids = {str(note.id) for note in job.notes}  # Create a set of existing note IDs as strings
+
+    for key in set([key.split('[')[1].split(']')[0] for key in note_keys]):  # Deduplicate note indexes
+        note_id = request.form.get(f'notes[{key}][id]', None)
+        note_stage = request.form.get(f'notes[{key}][stage]')
+        note_text = request.form.get(f'notes[{key}][note_text]')
+
+        if note_id and note_id in existing_note_ids:  # If the note ID exists and matches an existing note
+            existing_note = Note.query.get(note_id)
+            if existing_note:
+                existing_note.stage = note_stage
+                existing_note.note_text = note_text
+        elif not note_id:  # Only add new notes if they don't have an ID (this means they are new)
             new_note = Note(
                 job_id=job.id,
-                stage=note_data['stage'],
-                note_text=note_data['note_text']
+                stage=note_stage,
+                note_text=note_text
             )
             db.session.add(new_note)
+
+
 
     # Handle document uploads
     if 'documents[]' in request.files:
