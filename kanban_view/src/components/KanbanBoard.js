@@ -7,6 +7,8 @@ import FilterPanel from './FilterPanel';
 import AddJob from './AddJob';
 import EditJob from './EditJob';
 import ListToolbar from './ListToolbar';  // Import the new ListToolbar component
+import ConfirmModal from './ConfirmModal';  // Import the confirmation modal
+
 
 const stages = ['Saved', 'Applied', 'Interviewing', 'Offer', 'Rejected'];
 
@@ -17,6 +19,9 @@ function KanbanBoard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});  // Store active filters
+  const [showConfirmModal, setShowConfirmModal] = useState(false);  // Controls the visibility of the modal
+  const [jobToDelete, setJobToDelete] = useState(null);  // Tracks the job to be deleted
+
   const apiUrl = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
@@ -72,12 +77,24 @@ function KanbanBoard() {
   };
 
   const handleDeleteJob = (jobId) => {
-    axios.delete(`${apiUrl}/api/jobs/${jobId}`)
+    setShowConfirmModal(true);  // Show the confirmation modal
+    setJobToDelete(jobId);      // Save the job ID that is to be deleted
+  };
+
+  const confirmDelete = () => {
+    axios.delete(`${apiUrl}/api/jobs/${jobToDelete}`)
       .then(() => {
-        setJobList(prevJobs => prevJobs.filter(job => job.id !== jobId));
-        setFilteredJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+        setJobList(prevJobs => prevJobs.filter(job => job.id !== jobToDelete));
+        setFilteredJobs(prevJobs => prevJobs.filter(job => job.id !== jobToDelete));
+        setShowConfirmModal(false);  // Hide the modal
+        setJobToDelete(null);        // Clear the job ID
       })
       .catch(error => console.error('Error deleting job:', error));
+  };
+
+  const cancelDelete = () => {
+    setShowConfirmModal(false);  // Hide the modal
+    setJobToDelete(null);        // Clear the job ID
   };
 
   return (
@@ -145,6 +162,14 @@ function KanbanBoard() {
           ))}
         </div>
       </DndProvider>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal 
+        show={showConfirmModal} 
+        onConfirm={confirmDelete} 
+        onCancel={cancelDelete} 
+        message="Are you sure you want to delete this job?" 
+      />
     </div>
   );
 }
