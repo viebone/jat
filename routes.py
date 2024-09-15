@@ -1,10 +1,14 @@
 from sqlalchemy import text
-from db import db
-from flask import request, redirect, url_for, flash, jsonify, send_from_directory, Blueprint, render_template, current_app
-from models import JobListing, Note, Document
+from extensions import db
+from flask import request, redirect, url_for, flash, jsonify, send_from_directory, Blueprint, render_template, current_app, session
+from flask_bcrypt import Bcrypt
+from models import JobListing, Note, Document, Users
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
+from flask_login import login_required, login_user, logout_user, current_user
 
+bcrypt = Bcrypt()
 bp = Blueprint('main', __name__)
 
 # Path to store uploaded documents
@@ -247,3 +251,40 @@ def delete_job(job_id):
     db.session.delete(job)
     db.session.commit()
     return jsonify({'message': 'Job deleted successfully'})
+
+# Register Route
+@bp.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    nickname = data.get('nickname')
+    email = data.get('email')
+    password = data.get('password')
+
+    if Users.query.filter_by(email=email).first():
+        return jsonify({'error': 'User already exists'}), 400
+
+    new_user = Users(nickname=nickname, email=email)
+    new_user.set_password(password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({'message': 'User registered successfully'}), 201
+
+# Your existing login route
+@bp.route('/login', methods=['POST'])
+def login():
+    email = request.json['email']
+    password = request.json['password']
+    user = Users.query.filter_by(email=email).first()
+    if user and user.check_password(password):
+        login_user(user)
+        return jsonify({'message': 'Login successful'}), 200
+    else:
+        return jsonify({'error': 'Invalid email or password'}), 401
+
+# Logout Route
+@bp.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logged out successfully'})
