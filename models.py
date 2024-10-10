@@ -1,7 +1,8 @@
-from db import db
+from extensions import db  # Import db from extensions, not directly from db.py
 from datetime import datetime
 from flask_bcrypt import Bcrypt
 from flask_login import UserMixin
+
 
 # Initialize bcrypt instance (Ensure this line is at the top level)
 bcrypt = Bcrypt()
@@ -19,10 +20,13 @@ class JobListing(db.Model):
     status = db.Column(db.String(50))
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
     job_description = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Link to Users table
+
 
     # Relationships
     notes = db.relationship('Note', back_populates='job_listing', cascade="all, delete-orphan")
     documents = db.relationship('Document', back_populates='job_listing', cascade="all, delete-orphan")
+    user = db.relationship('Users', back_populates='jobs')
 
     def __repr__(self):
         return f'<Job {self.job_title}>'
@@ -38,7 +42,6 @@ class Note(db.Model):
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
 
     job_listing = db.relationship('JobListing', back_populates='notes')
-
 
 class Document(db.Model):
     __tablename__ = 'documents'  # Define the table name explicitly
@@ -57,6 +60,9 @@ class Users(db.Model, UserMixin):
     nickname = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+
+    # Relationship to JobListing
+    jobs = db.relationship('JobListing', back_populates='user', lazy=True)
 
     def set_password(self, password):
         self.password = bcrypt.generate_password_hash(password).decode('utf-8')

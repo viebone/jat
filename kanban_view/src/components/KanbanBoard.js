@@ -8,11 +8,12 @@ import AddJob from './AddJob';
 import EditJob from './EditJob';
 import ListToolbar from './ListToolbar';  // Import the new ListToolbar component
 import ConfirmModal from './ConfirmModal';  // Import the confirmation modal
+import Header from './Header'; // Import the new Header component
 
 
 const stages = ['Saved', 'Applied', 'Interviewing', 'Offer', 'Rejected'];
 
-function KanbanBoard() {
+function KanbanBoard({ fetchCsrfToken }) {
   const [jobList, setJobList] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [jobToEdit, setJobToEdit] = useState(null);
@@ -21,8 +22,33 @@ function KanbanBoard() {
   const [activeFilters, setActiveFilters] = useState({});  // Store active filters
   const [showConfirmModal, setShowConfirmModal] = useState(false);  // Controls the visibility of the modal
   const [jobToDelete, setJobToDelete] = useState(null);  // Tracks the job to be deleted
-
+  const [nickname, setNickname] = useState(''); // Store the user's nickname
   const apiUrl = process.env.REACT_APP_API_URL;
+
+  //User details and logout function
+  const fetchUserDetails = () => {
+    axios.get(`${apiUrl}/api/user-details`, { withCredentials: true })
+      .then(response => {
+        setNickname(response.data.nickname);  // Set the user's nickname
+      })
+      .catch(error => console.error('Error fetching user details:', error));
+  };
+
+  const handleLogout = () => {
+    axios.post(`${apiUrl}/logout`, {}, { withCredentials: true })  // Add `withCredentials` to ensure the cookies are sent
+      .then(() => {
+        // Redirect the user to the login page or home page
+        window.location.href = '/';  // Redirect to home or login
+      })
+      .catch(error => console.error('Error logging out:', error));
+  };
+  
+  
+  useEffect(() => {
+    fetchJobs();
+    fetchUserDetails();  // Fetch user details (e.g., nickname) on component mount
+  }, []);
+  
 
   useEffect(() => {
     fetchJobs();  // Load jobs initially without filters
@@ -31,7 +57,7 @@ function KanbanBoard() {
   const fetchJobs = (filters = {}) => {
     setActiveFilters(filters);  // Update active filters
     const queryParams = new URLSearchParams(filters).toString();
-    axios.get(`${apiUrl}/api/jobs?${queryParams}`)
+    axios.get(`${apiUrl}/api/jobs?${queryParams}`, { withCredentials: true })
       .then(response => {
         setJobList(response.data);
         setFilteredJobs(response.data);
@@ -47,7 +73,7 @@ function KanbanBoard() {
     const updatedJob = jobList.find(job => job.id === jobId);
     if (updatedJob) {
       updatedJob.status = newStage;
-      axios.put(`${apiUrl}/api/jobs/${jobId}`, { status: newStage })
+      axios.put(`${apiUrl}/api/jobs/${jobId}`, { status: newStage }, { withCredentials: true })
         .then(() => {
           setJobList(prevJobs =>
             prevJobs.map(job =>
@@ -82,7 +108,7 @@ function KanbanBoard() {
   };
 
   const confirmDelete = () => {
-    axios.delete(`${apiUrl}/api/jobs/${jobToDelete}`)
+    axios.delete(`${apiUrl}/api/jobs/${jobToDelete}`, { withCredentials: true })
       .then(() => {
         setJobList(prevJobs => prevJobs.filter(job => job.id !== jobToDelete));
         setFilteredJobs(prevJobs => prevJobs.filter(job => job.id !== jobToDelete));
@@ -96,13 +122,12 @@ function KanbanBoard() {
     setShowConfirmModal(false);  // Hide the modal
     setJobToDelete(null);        // Clear the job ID
   };
+  
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      {/* Header Section */}
-      <div className="flex justify-between items-center bg-white shadow p-4 rounded-lg mb-4">
-        <h1 className="text-3xl font-bold text-gray-800">Job Application Tracker</h1>
-      </div>
+      {/* Header Component */}
+      <Header nickname={nickname} onLogout={handleLogout} />
 
       {/* List Toolbar */}
       <ListToolbar
@@ -133,7 +158,7 @@ function KanbanBoard() {
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-8 relative w-full max-w-lg mx-auto max-h-screen overflow-y-auto pb-4">
             <h2 className="text-xl font-bold mb-4">Edit Job</h2>
-            {jobToEdit && <EditJob job={jobToEdit} onJobEdited={handleJobEdited} />}
+            {jobToEdit && <EditJob job={jobToEdit} onJobEdited={handleJobEdited} fetchCsrfToken={fetchCsrfToken} />}
             <button
               className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
               onClick={() => setIsEditModalOpen(false)}

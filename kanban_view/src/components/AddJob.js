@@ -105,10 +105,16 @@ function AddJob({ onJobAdded }) {
     // Create form data to handle file uploads
     const formData = new FormData();
 
+    // Sanitize input fields
+    const sanitizedJobTitle =  newJob.title.trim();
+    const sanitizedCompany = newJob.company.trim();
+    const sanitizedJobPostLink = newJob.job_post_link.trim();
+    
+
     // Append job details
-    formData.append('title', newJob.title);
-    formData.append('company', newJob.company);
-    formData.append('job_post_link', newJob.job_post_link);
+    formData.append('title', sanitizedJobTitle);
+    formData.append('company', sanitizedCompany);
+    formData.append('job_post_link', sanitizedJobPostLink);
     formData.append('salary', newJob.salary);
     formData.append('location_type', newJob.location_type);
     formData.append('job_type', newJob.job_type);
@@ -128,6 +134,7 @@ function AddJob({ onJobAdded }) {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      withCredentials: true  // Include credentials (session cookie)
     })
       .then(() => {
         onJobAdded();  // Refresh the job list

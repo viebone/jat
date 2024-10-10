@@ -1,12 +1,14 @@
 from sqlalchemy import text
-from extensions import db
-from flask import request, redirect, url_for, flash, jsonify, send_from_directory, Blueprint, render_template, current_app, session
+from extensions import db, limiter, csrf  # Import csrf from extensions
+from flask import request, jsonify, Blueprint, current_app, session, make_response
+from flask_wtf.csrf import generate_csrf
 from flask_bcrypt import Bcrypt
 from models import JobListing, Note, Document, Users
 import os
 from werkzeug.utils import secure_filename
-from werkzeug.security import check_password_hash
 from flask_login import login_required, login_user, logout_user, current_user
+import bleach
+
 
 bcrypt = Bcrypt()
 bp = Blueprint('main', __name__)
@@ -27,6 +29,7 @@ def allowed_file(filename):
 
 # API to get jobs with filters
 @bp.route('/api/jobs', methods=['GET'])
+@login_required  # This ensures only logged-in users can add a job
 def get_jobs_api():
     status = request.args.get('status')
     job_type = request.args.get('job_type')
@@ -36,7 +39,8 @@ def get_jobs_api():
     company = request.args.get('company')
     date_created = request.args.get('date_created')
 
-    query = JobListing.query
+    # Only query jobs for the current user
+    query = JobListing.query.filter_by(user_id=current_user.id)
 
     if status:
         query = query.filter_by(status=status)
@@ -79,20 +83,22 @@ def get_jobs_api():
 
 # API to add job with document upload handling
 @bp.route('/api/jobs', methods=['POST'])
+@login_required  # This ensures only logged-in users can add a job
 def add_job_api():
     # Check if the request contains form data
     if 'title' not in request.form:
         return jsonify({'error': 'No job data provided'}), 400
 
     # Extract job data from the form
-    title = request.form['title']
-    company = request.form['company']
-    job_post_link = request.form.get('job_post_link', None)
-    salary = request.form.get('salary', None)
-    location_type = request.form.get('location_type', None)
-    job_type = request.form.get('job_type', None)
-    status = request.form.get('status', None)
-    job_description = request.form.get('job_description', None)
+    # Sanitize job data
+    title = bleach.clean(request.form['title'].strip())
+    company = bleach.clean(request.form['company'].strip())
+    job_post_link = bleach.clean(request.form.get('job_post_link', '').strip())
+    salary = request.form.get('salary', None)  # Assuming salary is a number, no need for bleach
+    location_type = bleach.clean(request.form.get('location_type', '').strip())
+    job_type = bleach.clean(request.form.get('job_type', '').strip())
+    status = bleach.clean(request.form.get('status', '').strip())
+    job_description = bleach.clean(request.form.get('job_description', '').strip())
 
     # Handle notes (which are sent as a JSON string)
     notes = request.form.get('notes', '[]')
@@ -107,7 +113,8 @@ def add_job_api():
         location_type=location_type,
         job_type=job_type,
         status=status,
-        job_description=job_description
+        job_description=job_description,
+        user_id=current_user.id  # Assign job to the current user
     )
     db.session.add(new_job)
     db.session.commit()
@@ -141,18 +148,31 @@ def add_job_api():
 
 # Edit job with document upload and deletion
 @bp.route('/api/jobs/<int:job_id>', methods=['PUT'])
+@login_required  # This ensures only logged-in users can add a job
 def update_job(job_id):
     job = JobListing.query.get_or_404(job_id)
 
-    # Update job details
-    job.job_title = request.form.get('title', job.job_title)
-    job.company = request.form.get('company', job.company)
-    job.job_post_link = request.form.get('job_post_link', job.job_post_link)
-    job.salary = request.form.get('salary', job.salary)
-    job.location_type = request.form.get('location_type', job.location_type)
-    job.job_type = request.form.get('job_type', job.job_type)
-    job.status = request.form.get('status', job.status)
-    job.job_description = request.form.get('job_description', job.job_description)
+    # Check if the request is JSON or form-data
+    if request.is_json:
+        # If the request is JSON (e.g., from drag-and-drop update)
+        job.job_title = bleach.clean(request.json.get('title', job.job_title).strip())
+        job.company = bleach.clean(request.json.get('company', job.company).strip())
+        job.job_post_link = bleach.clean(request.json.get('job_post_link', job.job_post_link).strip())
+        job.salary = request.json.get('salary', job.salary)  # Assuming salary is numeric, no need to bleach
+        job.location_type = bleach.clean(request.json.get('location_type', job.location_type).strip())
+        job.job_type = bleach.clean(request.json.get('job_type', job.job_type).strip())
+        job.status = bleach.clean(request.json.get('status', job.status).strip())
+        job.job_description = bleach.clean(request.json.get('job_description', job.job_description).strip())
+    else:
+        # If the request is form-data (e.g., from the update form)
+        job.job_title = bleach.clean(request.form.get('title', job.job_title).strip())
+        job.company = bleach.clean(request.form.get('company', job.company).strip())
+        job.job_post_link = bleach.clean(request.form.get('job_post_link', job.job_post_link).strip())
+        job.salary = request.form.get('salary', job.salary)  # Assuming salary is numeric
+        job.location_type = bleach.clean(request.form.get('location_type', job.location_type).strip())
+        job.job_type = bleach.clean(request.form.get('job_type', job.job_type).strip())
+        job.status = bleach.clean(request.form.get('status', job.status).strip())
+        job.job_description = bleach.clean(request.form.get('job_description', job.job_description).strip())
 
     # Handle notes (add or update)
     notes_data = request.form.to_dict(flat=False)  # Convert form data to a dictionary
@@ -232,6 +252,7 @@ def update_job(job_id):
 
 # API to delete a job
 @bp.route('/api/jobs/<int:job_id>', methods=['DELETE'])
+@login_required  # This ensures only logged-in users can add a job
 def delete_job(job_id):
     job = JobListing.query.get_or_404(job_id)
 
@@ -256,9 +277,9 @@ def delete_job(job_id):
 @bp.route('/register', methods=['POST'])
 def register():
     data = request.json
-    nickname = data.get('nickname')
-    email = data.get('email')
-    password = data.get('password')
+    nickname = bleach.clean(data.get('nickname', '').strip())
+    email = bleach.clean(data.get('email', '').strip())
+    password = data.get('password').strip()
 
     if Users.query.filter_by(email=email).first():
         return jsonify({'error': 'User already exists'}), 400
@@ -270,21 +291,56 @@ def register():
 
     return jsonify({'message': 'User registered successfully'}), 201
 
-# Your existing login route
-@bp.route('/login', methods=['POST'])
+@csrf.exempt
+@bp.route('/login', methods=['GET', 'OPTIONS', 'POST'])
+@limiter.limit("5 per minute", methods=["POST"])  # Limit only POST requests, not GET or OPTIONS
 def login():
-    email = request.json['email']
-    password = request.json['password']
-    user = Users.query.filter_by(email=email).first()
-    if user and user.check_password(password):
-        login_user(user)
-        return jsonify({'message': 'Login successful'}), 200
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRFToken")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response
+
+    if request.method == 'GET':
+        # This handles the GET request when Flask-Login redirects an unauthenticated user.
+        return jsonify({'error': 'Login page requested, please login via POST'}), 200
+
+    if request.method == 'POST':
+        email = bleach.clean(request.json['email'].strip())
+        password = request.json['password'].strip()
+        user = Users.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            login_user(user)
+            return jsonify({'message': 'Login successful'}), 200
+        else:
+            return jsonify({'error': 'Invalid email or password'}), 401
+
     else:
-        return jsonify({'error': 'Invalid email or password'}), 401
+        # This handles the GET request (e.g., when Flask-Login redirects to /login)
+        return jsonify({'error': 'Login requires POST request'}), 405
+
 
 # Logout Route
 @bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()
-    return jsonify({'message': 'Logged out successfully'})
+    return '', 204  # No content to return, just a successful response
+
+# Get user details API
+@bp.route('/api/user-details', methods=['GET'])
+@login_required
+def get_user_details_api():
+    # Return the current user's details, such as their nickname and email
+    user_details = {
+        "nickname": current_user.nickname,
+        "email": current_user.email
+    }
+    return jsonify(user_details), 200
+
+@bp.route('/api/get-csrf-token', methods=['GET'])
+def get_csrf_token():
+    token = generate_csrf()  # Generate CSRF token
+    return jsonify({'csrf_token': token})

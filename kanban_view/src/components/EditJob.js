@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-function EditJob({ job, onJobEdited }) {
+function EditJob({ job, onJobEdited, fetchCsrfToken }) {
   const [updatedJob, setUpdatedJob] = useState(job);
   const [newNoteText, setNewNoteText] = useState('');  // For adding new notes
   const [newNoteStage, setNewNoteStage] = useState('Saved');  // For selecting the stage of a new note
@@ -96,14 +96,27 @@ function EditJob({ job, onJobEdited }) {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Fetch the CSRF token using the prop
+    const csrfToken = await fetchCsrfToken();
+    if (!csrfToken) {
+      console.error('CSRF token not available');
+      return;
+    }
+
+    // Sanitize input fields
+    const sanitizedJobTitle = updatedJob.job_title.trim();
+    const sanitizedCompany = updatedJob.company.trim();
+    const sanitizedJobPostLink = updatedJob.job_post_link.trim();
+    const sanitizedSalary = updatedJob.salary;
+
     const formData = new FormData();
-    formData.append('title', updatedJob.job_title);
-    formData.append('company', updatedJob.company);
-    formData.append('job_post_link', updatedJob.job_post_link);
-    formData.append('salary', updatedJob.salary);
+    formData.append('title', sanitizedJobTitle);
+    formData.append('company', sanitizedCompany);
+    formData.append('job_post_link', sanitizedJobPostLink);
+    formData.append('salary', sanitizedSalary);
     formData.append('location_type', updatedJob.location_type);
     formData.append('job_type', updatedJob.job_type);
     formData.append('status', updatedJob.status);
@@ -136,15 +149,18 @@ function EditJob({ job, onJobEdited }) {
       formData.append('remove_note_ids[]', noteId);
     });
 
-    axios.put(`${process.env.REACT_APP_API_URL}/api/jobs/${updatedJob.id}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    .then(() => {
-      onJobEdited();  // Close the modal and refresh jobs after editing
-    })
-    .catch((error) => console.error('Error updating job:', error));
+    // Make the PUT request with CSRF token in the headers
+  axios.put(`${process.env.REACT_APP_API_URL}/api/jobs/${updatedJob.id}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      'X-CSRFToken': csrfToken,  // Include the CSRF token
+    },
+    withCredentials: true,  // Ensure credentials are included
+  })
+  .then(() => {
+    onJobEdited();
+  })
+  .catch((error) => console.error('Error updating job:', error));
   };
 
   return (
