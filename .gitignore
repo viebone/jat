@@ -17,3 +17,6 @@ config.py
 
 # Ignore cache directories
 .cache/
+
+#ignore uploads dir
+uploads
